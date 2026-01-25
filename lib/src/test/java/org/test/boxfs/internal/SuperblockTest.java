@@ -17,8 +17,19 @@ class SuperblockTest {
     }
 
     @Test
-    void rejectInvalidBlockSize() {
+    void rejectNonPowerOfTwoBlockSize() {
         assertThrows(IllegalArgumentException.class, () -> new Superblock(1000, 256));
+    }
+
+    @Test
+    void rejectBlockSizeBelowMinimum() {
+        assertThrows(IllegalArgumentException.class, () -> new Superblock(256, 256));
+    }
+
+    @Test
+    void acceptMinimumBlockSize() {
+        var sb = new Superblock(512, 256);
+        assertEquals(512, sb.getBlockSize());
     }
 
     @Test
@@ -41,7 +52,7 @@ class SuperblockTest {
         original.addMetadataExtent(new Extent(5, 3));
 
         var data = original.serialize();
-        assertEquals(Superblock.SUPERBLOCK_SIZE, data.length);
+        assertEquals(4096, data.length);
 
         var restored = Superblock.deserialize(data);
         assertEquals(original.getBlockSize(), restored.getBlockSize());
@@ -52,10 +63,8 @@ class SuperblockTest {
     @Test
     void blockOffsetCalculation() {
         var sb = new Superblock(4096, 256);
-        // Block 0 starts after superblock (512 bytes)
-        assertEquals(512, sb.blockOffset(0));
-        // Block 1 starts at 512 + 4096
-        assertEquals(512 + 4096, sb.blockOffset(1));
+        assertEquals(4096, sb.blockOffset(0));
+        assertEquals(8192, sb.blockOffset(1));
     }
 
     @Test

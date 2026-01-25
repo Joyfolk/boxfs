@@ -13,7 +13,8 @@ import java.util.List;
  */
 public class Superblock {
 
-    public static final int SUPERBLOCK_SIZE = 512;
+    public static final int HEADER_SIZE = 512;
+    public static final int MIN_BLOCK_SIZE = 512;
     public static final int MAGIC = 0x424F5846; // "BOXF"
     public static final int VERSION = 1;
     public static final int DEFAULT_BLOCK_SIZE = 4096;
@@ -29,8 +30,11 @@ public class Superblock {
     }
 
     public Superblock(int blockSize, long totalBlocks) {
-        if (blockSize <= 0 || (blockSize & (blockSize - 1)) != 0) {
-            throw new IllegalArgumentException("blockSize must be a positive power of 2");
+        if (blockSize < MIN_BLOCK_SIZE) {
+            throw new IllegalArgumentException("blockSize must be at least " + MIN_BLOCK_SIZE);
+        }
+        if ((blockSize & (blockSize - 1)) != 0) {
+            throw new IllegalArgumentException("blockSize must be a power of 2");
         }
         if (totalBlocks <= 0) {
             throw new IllegalArgumentException("totalBlocks must be positive");
@@ -70,7 +74,7 @@ public class Superblock {
      * Serializes the superblock to a byte buffer.
      */
     public byte[] serialize() {
-        var buffer = ByteBuffer.allocate(SUPERBLOCK_SIZE);
+        var buffer = ByteBuffer.allocate(blockSize);
         buffer.order(ByteOrder.BIG_ENDIAN);
 
         buffer.putInt(MAGIC);
@@ -84,7 +88,7 @@ public class Superblock {
             buffer.putInt(extent.blockCount());
         }
 
-        while (buffer.position() < SUPERBLOCK_SIZE) {
+        while (buffer.position() < blockSize) {
             buffer.put((byte) 0);
         }
 
@@ -95,7 +99,7 @@ public class Superblock {
      * Deserializes a superblock from a byte array.
      */
     public static Superblock deserialize(byte[] data) throws IOException {
-        if (data.length < SUPERBLOCK_SIZE) {
+        if (data.length < HEADER_SIZE) {
             throw new IOException("Superblock data too short");
         }
 
@@ -135,7 +139,7 @@ public class Superblock {
      * Returns the byte offset for a given block number.
      */
     public long blockOffset(long blockNumber) {
-        return SUPERBLOCK_SIZE + (blockNumber * blockSize);
+        return blockSize + (blockNumber * blockSize);
     }
 
     /**

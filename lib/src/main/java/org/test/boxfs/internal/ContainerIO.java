@@ -40,7 +40,7 @@ public class ContainerIO implements Closeable {
             channel.write(buffer);
         }
 
-        var totalSize = Superblock.SUPERBLOCK_SIZE + (totalBlocks * blockSize);
+        var totalSize = (long) blockSize + (totalBlocks * blockSize);
         channel.position(totalSize - 1);
         channel.write(ByteBuffer.wrap(new byte[]{0}));
 
@@ -55,7 +55,7 @@ public class ContainerIO implements Closeable {
                 ? FileChannel.open(path, StandardOpenOption.READ)
                 : FileChannel.open(path, StandardOpenOption.READ, StandardOpenOption.WRITE);
 
-        var buffer = ByteBuffer.allocate(Superblock.SUPERBLOCK_SIZE);
+        var buffer = ByteBuffer.allocate(Superblock.HEADER_SIZE);
         channel.position(0);
         while (buffer.hasRemaining()) {
             if (channel.read(buffer) == -1) {
