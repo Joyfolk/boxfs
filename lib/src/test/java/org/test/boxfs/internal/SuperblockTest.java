@@ -42,7 +42,7 @@ class SuperblockTest {
         var sb = new Superblock(4096, 256);
         sb.addMetadataExtent(new Extent(0, 2));
         assertEquals(1, sb.getMetadataExtents().size());
-        assertEquals(0, sb.getMetadataExtents().get(0).startBlock());
+        assertEquals(0, sb.getMetadataExtents().getFirst().startBlock());
     }
 
     @Test

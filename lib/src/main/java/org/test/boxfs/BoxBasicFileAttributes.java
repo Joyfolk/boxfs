@@ -7,60 +7,57 @@ import java.nio.file.attribute.FileTime;
 
 /**
  * BasicFileAttributes implementation for BoxFS.
- * Timestamps are minimal (returns epoch) as per design.
  */
 public class BoxBasicFileAttributes implements BasicFileAttributes {
 
-    private static final FileTime EPOCH = FileTime.fromMillis(0);
+  private final Inode inode;
 
-    private final Inode inode;
+  BoxBasicFileAttributes(Inode inode) {
+    this.inode = inode;
+  }
 
-    BoxBasicFileAttributes(Inode inode) {
-        this.inode = inode;
-    }
+  @Override
+  public FileTime lastModifiedTime() {
+    return FileTime.fromMillis(inode.getLastModifiedTime());
+  }
 
-    @Override
-    public FileTime lastModifiedTime() {
-        return EPOCH;
-    }
+  @Override
+  public FileTime lastAccessTime() {
+    return FileTime.fromMillis(inode.getLastAccessTime());
+  }
 
-    @Override
-    public FileTime lastAccessTime() {
-        return EPOCH;
-    }
+  @Override
+  public FileTime creationTime() {
+    return FileTime.fromMillis(inode.getCreationTime());
+  }
 
-    @Override
-    public FileTime creationTime() {
-        return EPOCH;
-    }
+  @Override
+  public boolean isRegularFile() {
+    return inode.isFile();
+  }
 
-    @Override
-    public boolean isRegularFile() {
-        return inode.isFile();
-    }
+  @Override
+  public boolean isDirectory() {
+    return inode.isDirectory();
+  }
 
-    @Override
-    public boolean isDirectory() {
-        return inode.isDirectory();
-    }
+  @Override
+  public boolean isSymbolicLink() {
+    return false;
+  }
 
-    @Override
-    public boolean isSymbolicLink() {
-        return false;
-    }
+  @Override
+  public boolean isOther() {
+    return false;
+  }
 
-    @Override
-    public boolean isOther() {
-        return false;
-    }
+  @Override
+  public long size() {
+    return inode.getSize();
+  }
 
-    @Override
-    public long size() {
-        return inode.getSize();
-    }
-
-    @Override
-    public Object fileKey() {
-        return inode.getId();
-    }
+  @Override
+  public Object fileKey() {
+    return inode.getId();
+  }
 }

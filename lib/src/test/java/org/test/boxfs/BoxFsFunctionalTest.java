@@ -81,7 +81,7 @@ class BoxFsFunctionalTest {
             var target = restoreDir.resolve(fileName);
             Files.createDirectories(target.getParent());
 
-            // Read from source and write to target (copy)
+            // Read from the source and write to target (copy)
             var content = Files.readAllBytes(source);
             Files.write(target, content);
         }

@@ -57,7 +57,7 @@ class SpaceManagerTest {
         // Should be coalesced
         var freeExtents = spaceManager.getFreeExtents();
         assertEquals(1, freeExtents.size());
-        assertEquals(99, freeExtents.get(0).blockCount());
+        assertEquals(99, freeExtents.getFirst().blockCount());
     }
 
     @Test

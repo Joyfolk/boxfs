@@ -36,12 +36,20 @@ public class Inode {
     private final Type type;
     private long size;
     private final List<Extent> extents;
+    private long creationTime;
+    private long lastModifiedTime;
+    private long lastAccessTime;
 
     public Inode(long id, Type type) {
-        this(id, type, 0, new ArrayList<>());
+        this(id, type, 0, new ArrayList<>(), System.currentTimeMillis());
     }
 
-    public Inode(long id, Type type, long size, List<Extent> extents) {
+    public Inode(long id, Type type, long size, List<Extent> extents, long creationTime) {
+        this(id, type, size, extents, creationTime, creationTime, creationTime);
+    }
+
+    public Inode(long id, Type type, long size, List<Extent> extents,
+                 long creationTime, long lastModifiedTime, long lastAccessTime) {
         if (id < 0) {
             throw new IllegalArgumentException("id must be non-negative");
         }
@@ -55,6 +63,9 @@ public class Inode {
         this.type = type;
         this.size = size;
         this.extents = new ArrayList<>(extents);
+        this.creationTime = creationTime;
+        this.lastModifiedTime = lastModifiedTime;
+        this.lastAccessTime = lastAccessTime;
     }
 
     public long getId() {
@@ -106,5 +117,43 @@ public class Inode {
      */
     public long getAllocatedBlocks() {
         return extents.stream().mapToLong(Extent::blockCount).sum();
+    }
+
+    public long getCreationTime() {
+        return creationTime;
+    }
+
+    public long getLastModifiedTime() {
+        return lastModifiedTime;
+    }
+
+    public void setLastModifiedTime(long lastModifiedTime) {
+        this.lastModifiedTime = lastModifiedTime;
+    }
+
+    public long getLastAccessTime() {
+        return lastAccessTime;
+    }
+
+    public void setLastAccessTime(long lastAccessTime) {
+        this.lastAccessTime = lastAccessTime;
+    }
+
+    public void setTimes(Long lastModifiedTime, Long lastAccessTime, Long creationTime) {
+        if (lastModifiedTime != null) {
+            this.lastModifiedTime = lastModifiedTime;
+        }
+        if (lastAccessTime != null) {
+            this.lastAccessTime = lastAccessTime;
+        }
+        if (creationTime != null) {
+            this.creationTime = creationTime;
+        }
+    }
+
+    public void touch() {
+        var now = System.currentTimeMillis();
+        this.lastModifiedTime = now;
+        this.lastAccessTime = now;
     }
 }

@@ -30,15 +30,15 @@ All multi-byte values are stored in **big-endian** format.
 
 Located at offset 0, occupies one full block. The header fields are within the first 512 bytes.
 
-| Offset | Size | Type   | Description                          |
-|--------|------|--------|--------------------------------------|
-| 0      | 4    | uint32 | Magic number: `0x424F5846` ("BOXF")  |
-| 4      | 4    | uint32 | Version: `1`                         |
+| Offset | Size | Type   | Description                               |
+|--------|------|--------|-------------------------------------------|
+| 0      | 4    | uint32 | Magic number: `0x424F5846` ("BOXF")       |
+| 4      | 4    | uint32 | Version: `1`                              |
 | 8      | 4    | uint32 | Block size in bytes (min 512, power of 2) |
-| 12     | 8    | uint64 | Total number of blocks               |
-| 20     | 4    | uint32 | Metadata extent count (max 10)       |
-| 24     | 12×N | extent | Metadata extents array               |
-| ...    | ...  | zeros  | Padding to blockSize                 |
+| 12     | 8    | uint64 | Total number of blocks                    |
+| 20     | 4    | uint32 | Metadata extent count (max 10)            |
+| 24     | 12×N | extent | Metadata extents array                    |
+| ...    | ...  | zeros  | Padding to blockSize                      |
 
 ### Extent Structure (12 bytes)
 
@@ -62,13 +62,16 @@ Serialized sequentially as: Inodes → Directory Entries → Free Extents.
 
 Repeated `inodeCount` times:
 
-| Offset | Size | Type   | Description                    |
-|--------|------|--------|--------------------------------|
-| 0      | 8    | uint64 | Inode ID                       |
+| Offset | Size | Type   | Description                       |
+|--------|------|--------|-----------------------------------|
+| 0      | 8    | uint64 | Inode ID                          |
 | 8      | 1    | uint8  | Type: `0` = file, `1` = directory |
-| 9      | 8    | uint64 | File size in bytes             |
-| 17     | 4    | uint32 | Extent count for this inode    |
-| 21     | 12×N | extent | Data extents array             |
+| 9      | 8    | uint64 | File size in bytes                |
+| 17     | 8    | int64  | Creation time (millis since epoch)|
+| 25     | 8    | int64  | Last modified time (millis)       |
+| 33     | 8    | int64  | Last access time (millis)         |
+| 41     | 4    | uint32 | Extent count for this inode       |
+| 45     | 12×N | extent | Data extents array                |
 
 Root directory always has inode ID `0`.
 
@@ -97,7 +100,7 @@ Followed by entries:
 ## Data Storage
 
 File data is stored in blocks referenced by the inode's extent list.
-Extents are allocated using first-fit strategy and coalesced on free.
+Extents are allocated using a first-fit strategy and coalesced on free.
 
 ### Example: File with 10KB of data (blockSize = 4096)
 

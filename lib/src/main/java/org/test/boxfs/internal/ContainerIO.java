@@ -50,10 +50,8 @@ public class ContainerIO implements Closeable {
     /**
      * Opens an existing container file.
      */
-    public static ContainerIO open(Path path, boolean readOnly) throws IOException {
-        var channel = readOnly
-                ? FileChannel.open(path, StandardOpenOption.READ)
-                : FileChannel.open(path, StandardOpenOption.READ, StandardOpenOption.WRITE);
+    public static ContainerIO open(Path path) throws IOException {
+        var channel = FileChannel.open(path, StandardOpenOption.READ, StandardOpenOption.WRITE);
 
         var buffer = ByteBuffer.allocate(Superblock.HEADER_SIZE);
         channel.position(0);

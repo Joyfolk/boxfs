@@ -17,7 +17,7 @@ repositories {
 }
 
 dependencies {
-    // No external dependencies - only test dependencies
+    compileOnly("org.jetbrains:annotations:26.0.1")
 }
 
 testing {

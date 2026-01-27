@@ -85,6 +85,9 @@ public class MetadataSerializer {
         dos.writeLong(inode.getId());
         dos.writeByte(inode.getType().code());
         dos.writeLong(inode.getSize());
+        dos.writeLong(inode.getCreationTime());
+        dos.writeLong(inode.getLastModifiedTime());
+        dos.writeLong(inode.getLastAccessTime());
 
         var extents = inode.getExtents();
         dos.writeInt(extents.size());
@@ -97,6 +100,9 @@ public class MetadataSerializer {
         var id = dis.readLong();
         var type = Inode.Type.fromCode(dis.readByte());
         var size = dis.readLong();
+        var creationTime = dis.readLong();
+        var lastModifiedTime = dis.readLong();
+        var lastAccessTime = dis.readLong();
 
         var extentCount = dis.readInt();
         var extents = new ArrayList<Extent>(extentCount);
@@ -104,7 +110,7 @@ public class MetadataSerializer {
             extents.add(readExtent(dis));
         }
 
-        return new Inode(id, type, size, extents);
+        return new Inode(id, type, size, extents, creationTime, lastModifiedTime, lastAccessTime);
     }
 
     private static void writeDirectoryEntry(DataOutputStream dos, DirectoryEntry entry)

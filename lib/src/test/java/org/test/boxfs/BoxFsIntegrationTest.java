@@ -11,7 +11,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -133,6 +132,213 @@ class BoxFsIntegrationTest {
     }
 
     @Test
+    void moveFromBoxFsToOsFileSystem() throws IOException {
+        var boxFile = fs.getPath("/tomove.txt");
+        var osFile = tempDir.resolve("moved.txt");
+        Files.write(boxFile, "move me".getBytes());
+
+        Files.move(boxFile, osFile);
+
+        assertFalse(Files.exists(boxFile));
+        assertTrue(Files.exists(osFile));
+        assertEquals("move me", Files.readString(osFile));
+    }
+
+    @Test
+    void moveFromOsFileSystemToBoxFs() throws IOException {
+        var osFile = tempDir.resolve("tomove.txt");
+        var boxFile = fs.getPath("/moved.txt");
+        Files.write(osFile, "move me".getBytes());
+
+        Files.move(osFile, boxFile);
+
+        assertFalse(Files.exists(osFile));
+        assertTrue(Files.exists(boxFile));
+        assertEquals("move me", Files.readString(boxFile));
+    }
+
+    @Test
+    void moveBetweenDifferentContainersFails() throws IOException {
+        var container2 = tempDir.resolve("test2.box");
+        var uri2 = URI.create("box:" + container2);
+
+        try (var fs2 = FileSystems.newFileSystem(uri2, Map.of("create", "true", "totalBlocks", 64L))) {
+            var source = fs.getPath("/source.txt");
+            var target = fs2.getPath("/target.txt");
+            Files.write(source, "content".getBytes());
+
+            var ex = assertThrows(IOException.class, () -> Files.move(source, target));
+            assertTrue(ex.getMessage().contains("different containers"));
+        }
+    }
+
+    @Test
+    void copyFile() throws IOException {
+        var source = fs.getPath("/source.txt");
+        var target = fs.getPath("/copy.txt");
+        Files.write(source, "copy me".getBytes());
+
+        Files.copy(source, target);
+
+        assertTrue(Files.exists(source));
+        assertTrue(Files.exists(target));
+        assertEquals("copy me", Files.readString(source));
+        assertEquals("copy me", Files.readString(target));
+    }
+
+    @Test
+    void copyFileBetweenDirectories() throws IOException {
+        var dir1 = fs.getPath("/dir1");
+        var dir2 = fs.getPath("/dir2");
+        Files.createDirectory(dir1);
+        Files.createDirectory(dir2);
+
+        var source = dir1.resolve("file.txt");
+        var target = dir2.resolve("copied.txt");
+        Files.write(source, "copying".getBytes());
+
+        Files.copy(source, target);
+
+        assertTrue(Files.exists(source));
+        assertTrue(Files.exists(target));
+        assertEquals("copying", Files.readString(source));
+        assertEquals("copying", Files.readString(target));
+    }
+
+    @Test
+    void copyFileReplaceExisting() throws IOException {
+        var source = fs.getPath("/source.txt");
+        var target = fs.getPath("/target.txt");
+        Files.write(source, "new content".getBytes());
+        Files.write(target, "old content".getBytes());
+
+        Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+
+        assertEquals("new content", Files.readString(target));
+    }
+
+    @Test
+    void copyFileFailsIfTargetExists() throws IOException {
+        var source = fs.getPath("/source.txt");
+        var target = fs.getPath("/target.txt");
+        Files.write(source, "source".getBytes());
+        Files.write(target, "target".getBytes());
+
+        assertThrows(FileAlreadyExistsException.class, () -> Files.copy(source, target));
+    }
+
+    @Test
+    void copyLargeFile() throws IOException {
+        var source = fs.getPath("/large.bin");
+        var target = fs.getPath("/large_copy.bin");
+        var data = new byte[50_000];
+        for (var i = 0; i < data.length; i++) {
+            data[i] = (byte) (i % 256);
+        }
+        Files.write(source, data);
+
+        Files.copy(source, target);
+
+        assertArrayEquals(data, Files.readAllBytes(target));
+    }
+
+    @Test
+    void copyEmptyFile() throws IOException {
+        var source = fs.getPath("/empty.txt");
+        var target = fs.getPath("/empty_copy.txt");
+        Files.write(source, new byte[0]);
+
+        Files.copy(source, target);
+
+        assertTrue(Files.exists(target));
+        assertEquals(0, Files.size(target));
+    }
+
+    @Test
+    void copyNonExistentFileFails() {
+        var source = fs.getPath("/nonexistent.txt");
+        var target = fs.getPath("/target.txt");
+
+        assertThrows(NoSuchFileException.class, () -> Files.copy(source, target));
+    }
+
+    @Test
+    void copyFromBoxFsToOsFileSystem() throws IOException {
+        var boxFile = fs.getPath("/export.txt");
+        var osFile = tempDir.resolve("exported.txt");
+        Files.write(boxFile, "export me".getBytes());
+
+        Files.copy(boxFile, osFile);
+
+        assertTrue(Files.exists(osFile));
+        assertEquals("export me", Files.readString(osFile));
+    }
+
+    @Test
+    void copyFromOsFileSystemToBoxFs() throws IOException {
+        var osFile = tempDir.resolve("import.txt");
+        var boxFile = fs.getPath("/imported.txt");
+        Files.write(osFile, "import me".getBytes());
+
+        Files.copy(osFile, boxFile);
+
+        assertTrue(Files.exists(boxFile));
+        assertEquals("import me", Files.readString(boxFile));
+    }
+
+    @Test
+    void copyBetweenDifferentContainersFails() throws IOException {
+        var container2 = tempDir.resolve("test2.box");
+        var uri2 = URI.create("box:" + container2);
+
+        try (var fs2 = FileSystems.newFileSystem(uri2, Map.of("create", "true", "totalBlocks", 64L))) {
+            var source = fs.getPath("/source.txt");
+            var target = fs2.getPath("/target.txt");
+            Files.write(source, "content".getBytes());
+
+            var ex = assertThrows(IOException.class, () -> Files.copy(source, target));
+            assertTrue(ex.getMessage().contains("different containers"));
+        }
+    }
+
+    // POSIX semantics: cannot replace directory with file or vice versa
+    @Test
+    void moveFileToReplaceDirectoryFails() throws IOException {
+        var file = fs.getPath("/source.txt");
+        var dir = fs.getPath("/target");
+        Files.write(file, "content".getBytes());
+        Files.createDirectory(dir);
+
+        var ex = assertThrows(IOException.class,
+                () -> Files.move(file, dir, StandardCopyOption.REPLACE_EXISTING));
+        assertTrue(ex.getMessage().contains("Cannot replace directory with file"));
+    }
+
+    @Test
+    void moveDirectoryToReplaceFileFails() throws IOException {
+        var dir = fs.getPath("/source");
+        var file = fs.getPath("/target.txt");
+        Files.createDirectory(dir);
+        Files.write(file, "content".getBytes());
+
+        var ex = assertThrows(IOException.class,
+                () -> Files.move(dir, file, StandardCopyOption.REPLACE_EXISTING));
+        assertTrue(ex.getMessage().contains("Cannot replace file with directory"));
+    }
+
+    @Test
+    void copyFileToReplaceDirectoryFails() throws IOException {
+        var file = fs.getPath("/source.txt");
+        var dir = fs.getPath("/target");
+        Files.write(file, "content".getBytes());
+        Files.createDirectory(dir);
+
+        var ex = assertThrows(IOException.class,
+                () -> Files.copy(file, dir, StandardCopyOption.REPLACE_EXISTING));
+        assertTrue(ex.getMessage().contains("Cannot replace directory with file"));
+    }
+
+    @Test
     void listDirectory() throws IOException {
         var dir = fs.getPath("/listtest");
         Files.createDirectory(dir);
@@ -171,6 +377,51 @@ class BoxFsIntegrationTest {
 
         assertFalse(attrs.isRegularFile());
         assertTrue(attrs.isDirectory());
+    }
+
+    @Test
+    void fileTimestamps() throws IOException {
+        var beforeCreate = System.currentTimeMillis();
+        var file = fs.getPath("/timestamps.txt");
+        Files.write(file, "initial".getBytes());
+        var afterCreate = System.currentTimeMillis();
+
+        var attrs = Files.readAttributes(file, BasicFileAttributes.class);
+
+        // Creation time should be set
+        var creationTime = attrs.creationTime().toMillis();
+        assertTrue(creationTime >= beforeCreate && creationTime <= afterCreate,
+                "Creation time should be between beforeCreate and afterCreate");
+
+        // Modification time should match creation time initially
+        assertEquals(attrs.lastModifiedTime().toMillis(), attrs.lastAccessTime().toMillis());
+
+        // Wait a bit and modify the file
+        try { Thread.sleep(10); } catch (InterruptedException ignored) {}
+        var beforeModify = System.currentTimeMillis();
+        Files.write(file, "modified".getBytes());
+        var afterModify = System.currentTimeMillis();
+
+        var attrsAfterModify = Files.readAttributes(file, BasicFileAttributes.class);
+        var modifiedTime = attrsAfterModify.lastModifiedTime().toMillis();
+
+        assertTrue(modifiedTime >= beforeModify && modifiedTime <= afterModify,
+                "Modified time should be updated after write");
+        assertEquals(creationTime, attrsAfterModify.creationTime().toMillis(),
+                "Creation time should not change");
+    }
+
+    @Test
+    void setFileTimestamps() throws IOException {
+        var file = fs.getPath("/settime.txt");
+        Files.write(file, "content".getBytes());
+
+        var customTime = java.nio.file.attribute.FileTime.fromMillis(1000000000000L);
+        var view = Files.getFileAttributeView(file, java.nio.file.attribute.BasicFileAttributeView.class);
+        view.setTimes(customTime, null, null);
+
+        var attrs = Files.readAttributes(file, BasicFileAttributes.class);
+        assertEquals(1000000000000L, attrs.lastModifiedTime().toMillis());
     }
 
     @Test
@@ -268,5 +519,49 @@ class BoxFsIntegrationTest {
 
         assertTrue(Files.exists(fs.getPath("/persist.txt")));
         assertEquals("persisted", Files.readString(fs.getPath("/persist.txt")));
+    }
+
+    @Test
+    void metadataGrowthWithFragmentation() throws IOException {
+        // Create a small filesystem to make fragmentation more likely
+        var smallContainer = tempDir.resolve("small.box");
+        var smallUri = URI.create("box:" + smallContainer);
+
+        try (var smallFs = FileSystems.newFileSystem(smallUri,
+                Map.of("create", "true", "totalBlocks", 32L, "blockSize", 512))) {
+
+            // Create many files to grow metadata and potentially fragment
+            for (int i = 0; i < 20; i++) {
+                var file = smallFs.getPath("/file" + i + ".txt");
+                Files.write(file, ("content" + i).getBytes());
+            }
+
+            // Delete some files to create gaps in free space
+            for (int i = 0; i < 20; i += 2) {
+                Files.delete(smallFs.getPath("/file" + i + ".txt"));
+            }
+
+            // Create more files - metadata grows while free space is fragmented
+            for (int i = 20; i < 30; i++) {
+                var file = smallFs.getPath("/file" + i + ".txt");
+                Files.write(file, ("content" + i).getBytes());
+            }
+        }
+
+        // Reopen and verify everything is intact
+        try (var smallFs = FileSystems.newFileSystem(smallUri, Map.of())) {
+            // Odd files should exist
+            for (int i = 1; i < 20; i += 2) {
+                assertTrue(Files.exists(smallFs.getPath("/file" + i + ".txt")));
+            }
+            // New files should exist
+            for (int i = 20; i < 30; i++) {
+                assertTrue(Files.exists(smallFs.getPath("/file" + i + ".txt")));
+            }
+            // Even files should be deleted
+            for (int i = 0; i < 20; i += 2) {
+                assertFalse(Files.exists(smallFs.getPath("/file" + i + ".txt")));
+            }
+        }
     }
 }
