@@ -7,11 +7,13 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -19,6 +21,8 @@ import static org.junit.jupiter.api.Assertions.*;
  * Integration tests using standard Files API.
  */
 class BoxFsIntegrationTest {
+
+    private static final int BLOCK_SIZE = 4096;
 
     @TempDir
     Path tempDir;
@@ -602,5 +606,296 @@ class BoxFsIntegrationTest {
                 assertFalse(Files.exists(smallFs.getPath("/file" + i + ".txt")));
             }
         }
+    }
+
+    // ==================== Block Boundary Edge Cases ====================
+
+    @Test
+    void fileExactlyOneBlock() throws IOException {
+        var file = fs.getPath("/exact_1_block.bin");
+        var data = randomData(BLOCK_SIZE);
+
+        Files.write(file, data);
+
+        assertArrayEquals(data, Files.readAllBytes(file));
+        assertEquals(BLOCK_SIZE, Files.size(file));
+    }
+
+    @Test
+    void fileOneByteUnderOneBlock() throws IOException {
+        var file = fs.getPath("/under_1_block.bin");
+        var data = randomData(BLOCK_SIZE - 1);
+
+        Files.write(file, data);
+
+        assertArrayEquals(data, Files.readAllBytes(file));
+        assertEquals(BLOCK_SIZE - 1, Files.size(file));
+    }
+
+    @Test
+    void fileOneByteOverOneBlock() throws IOException {
+        var file = fs.getPath("/over_1_block.bin");
+        var data = randomData(BLOCK_SIZE + 1);
+
+        Files.write(file, data);
+
+        assertArrayEquals(data, Files.readAllBytes(file));
+        assertEquals(BLOCK_SIZE + 1, Files.size(file));
+    }
+
+    @Test
+    void fileExactlyTwoBlocks() throws IOException {
+        var file = fs.getPath("/exact_2_blocks.bin");
+        var data = randomData(BLOCK_SIZE * 2);
+
+        Files.write(file, data);
+
+        assertArrayEquals(data, Files.readAllBytes(file));
+        assertEquals(BLOCK_SIZE * 2, Files.size(file));
+    }
+
+    @Test
+    void fileOneByteUnderTwoBlocks() throws IOException {
+        var file = fs.getPath("/under_2_blocks.bin");
+        var data = randomData(BLOCK_SIZE * 2 - 1);
+
+        Files.write(file, data);
+
+        assertArrayEquals(data, Files.readAllBytes(file));
+        assertEquals(BLOCK_SIZE * 2 - 1, Files.size(file));
+    }
+
+    @Test
+    void fileOneByteOverTwoBlocks() throws IOException {
+        var file = fs.getPath("/over_2_blocks.bin");
+        var data = randomData(BLOCK_SIZE * 2 + 1);
+
+        Files.write(file, data);
+
+        assertArrayEquals(data, Files.readAllBytes(file));
+        assertEquals(BLOCK_SIZE * 2 + 1, Files.size(file));
+    }
+
+    @Test
+    void seekToExactBlockBoundary() throws IOException {
+        var file = fs.getPath("/seek_boundary.bin");
+        var data = randomData(BLOCK_SIZE * 3);
+        Files.write(file, data);
+
+        try (var channel = Files.newByteChannel(file, StandardOpenOption.READ)) {
+            // Seek to exactly the start of the second block
+            channel.position(BLOCK_SIZE);
+
+            var buf = ByteBuffer.allocate(10);
+            channel.read(buf);
+
+            var expected = new byte[10];
+            System.arraycopy(data, BLOCK_SIZE, expected, 0, 10);
+            assertArrayEquals(expected, buf.array());
+        }
+    }
+
+    @Test
+    void readAcrossBlockBoundary() throws IOException {
+        var file = fs.getPath("/read_across.bin");
+        var data = randomData(BLOCK_SIZE * 2);
+        Files.write(file, data);
+
+        try (var channel = Files.newByteChannel(file, StandardOpenOption.READ)) {
+            // Position just before the block boundary and read across it
+            channel.position(BLOCK_SIZE - 5);
+
+            var buf = ByteBuffer.allocate(10);
+            channel.read(buf);
+
+            var expected = new byte[10];
+            System.arraycopy(data, BLOCK_SIZE - 5, expected, 0, 10);
+            assertArrayEquals(expected, buf.array());
+        }
+    }
+
+    @Test
+    void writeAcrossBlockBoundary() throws IOException {
+        var file = fs.getPath("/write_across.bin");
+        var initialData = randomData(BLOCK_SIZE * 2);
+        Files.write(file, initialData);
+
+        // Overwrite data across the block boundary
+        var newData = "BOUNDARY".getBytes();
+        try (var channel = Files.newByteChannel(file, StandardOpenOption.WRITE)) {
+            channel.position(BLOCK_SIZE - 4);
+            channel.write(ByteBuffer.wrap(newData));
+        }
+
+        // Verify the write
+        var result = Files.readAllBytes(file);
+        for (int i = 0; i < newData.length; i++) {
+            assertEquals(newData[i], result[BLOCK_SIZE - 4 + i]);
+        }
+    }
+
+    @Test
+    void truncateToExactlyOneBlock() throws IOException {
+        var file = fs.getPath("/truncate_1_block.bin");
+        var data = randomData(BLOCK_SIZE * 3);
+        Files.write(file, data);
+
+        try (var channel = Files.newByteChannel(file, StandardOpenOption.WRITE)) {
+            channel.truncate(BLOCK_SIZE);
+        }
+
+        assertEquals(BLOCK_SIZE, Files.size(file));
+        var result = Files.readAllBytes(file);
+        for (int i = 0; i < BLOCK_SIZE; i++) {
+            assertEquals(data[i], result[i]);
+        }
+    }
+
+    @Test
+    void truncateToOneByteUnderBlock() throws IOException {
+        var file = fs.getPath("/truncate_under.bin");
+        var data = randomData(BLOCK_SIZE * 2);
+        Files.write(file, data);
+
+        try (var channel = Files.newByteChannel(file, StandardOpenOption.WRITE)) {
+            channel.truncate(BLOCK_SIZE - 1);
+        }
+
+        assertEquals(BLOCK_SIZE - 1, Files.size(file));
+    }
+
+    @Test
+    void truncateToOneByteOverBlock() throws IOException {
+        var file = fs.getPath("/truncate_over.bin");
+        var data = randomData(BLOCK_SIZE * 2);
+        Files.write(file, data);
+
+        try (var channel = Files.newByteChannel(file, StandardOpenOption.WRITE)) {
+            channel.truncate(BLOCK_SIZE + 1);
+        }
+
+        assertEquals(BLOCK_SIZE + 1, Files.size(file));
+        var result = Files.readAllBytes(file);
+        for (int i = 0; i < BLOCK_SIZE + 1; i++) {
+            assertEquals(data[i], result[i]);
+        }
+    }
+
+    @Test
+    void metadataFitsInSingleBlock() throws IOException {
+        // Create a small number of files that should fit in one metadata block
+        for (int i = 0; i < 10; i++) {
+            var file = fs.getPath("/small" + i + ".txt");
+            Files.write(file, ("content" + i).getBytes());
+        }
+
+        // Close and reopen to verify metadata persistence
+        fs.close();
+        var uri = URI.create("box:" + container);
+        fs = FileSystems.newFileSystem(uri, Map.of());
+
+        // Verify all files exist and have correct content
+        for (int i = 0; i < 10; i++) {
+            var file = fs.getPath("/small" + i + ".txt");
+            assertTrue(Files.exists(file));
+            assertEquals("content" + i, Files.readString(file));
+        }
+    }
+
+    @Test
+    void metadataSpansMultipleBlocks() throws IOException {
+        // Create enough files to force metadata across multiple blocks
+        // ~85 bytes per file, 4096 / 85 ≈ 48 files per block
+        for (int i = 0; i < 100; i++) {
+            var file = fs.getPath("/file" + String.format("%03d", i) + ".txt");
+            Files.write(file, ("content" + i).getBytes());
+        }
+
+        // Close and reopen to verify metadata persistence
+        fs.close();
+        var uri = URI.create("box:" + container);
+        fs = FileSystems.newFileSystem(uri, Map.of());
+
+        // Verify all files exist and have correct content
+        for (int i = 0; i < 100; i++) {
+            var file = fs.getPath("/file" + String.format("%03d", i) + ".txt");
+            assertTrue(Files.exists(file), "File should exist: " + file);
+            assertEquals("content" + i, Files.readString(file));
+        }
+    }
+
+    @Test
+    void metadataAtBlockBoundary() throws IOException {
+        // Create files in batches, closing and reopening to test persistence at each step
+        int filesPerBatch = 15;
+        int totalBatches = 4; // Create ~60 files, should cross the ~48-file boundary
+
+        for (int batch = 0; batch < totalBatches; batch++) {
+            for (int i = 0; i < filesPerBatch; i++) {
+                int fileNum = batch * filesPerBatch + i;
+                var file = fs.getPath("/batch" + fileNum + ".txt");
+                Files.write(file, ("batch content " + fileNum).getBytes());
+            }
+
+            // Close and reopen after each batch
+            fs.close();
+            var uri = URI.create("box:" + container);
+            fs = FileSystems.newFileSystem(uri, Map.of());
+
+            // Verify all files so far
+            for (int j = 0; j <= batch; j++) {
+                for (int i = 0; i < filesPerBatch; i++) {
+                    int fileNum = j * filesPerBatch + i;
+                    var file = fs.getPath("/batch" + fileNum + ".txt");
+                    assertTrue(Files.exists(file), "File should exist: " + file);
+                    assertEquals("batch content " + fileNum, Files.readString(file));
+                }
+            }
+        }
+    }
+
+    @Test
+    void appendAtExactBlockBoundary() throws IOException {
+        var file = fs.getPath("/append_boundary.bin");
+        var data1 = randomData(BLOCK_SIZE);
+        Files.write(file, data1);
+
+        // Append more data (starts at exact block boundary)
+        var data2 = "APPENDED".getBytes();
+        Files.write(file, data2, StandardOpenOption.APPEND);
+
+        assertEquals(BLOCK_SIZE + data2.length, Files.size(file));
+
+        var result = Files.readAllBytes(file);
+        for (int i = 0; i < BLOCK_SIZE; i++) {
+            assertEquals(data1[i], result[i]);
+        }
+        for (int i = 0; i < data2.length; i++) {
+            assertEquals(data2[i], result[BLOCK_SIZE + i]);
+        }
+    }
+
+    @Test
+    void appendCrossingBlockBoundary() throws IOException {
+        var file = fs.getPath("/append_cross.bin");
+        var data1 = randomData(BLOCK_SIZE - 4);
+        Files.write(file, data1);
+
+        // Append data that crosses the block boundary
+        var data2 = "CROSSING".getBytes(); // 8 bytes, will span boundary
+        Files.write(file, data2, StandardOpenOption.APPEND);
+
+        assertEquals(BLOCK_SIZE - 4 + data2.length, Files.size(file));
+
+        var result = Files.readAllBytes(file);
+        for (int i = 0; i < data2.length; i++) {
+            assertEquals(data2[i], result[BLOCK_SIZE - 4 + i]);
+        }
+    }
+
+    private byte[] randomData(int size) {
+        var data = new byte[size];
+        new Random(size).nextBytes(data); // Use size as a seed for reproducibility
+        return data;
     }
 }
