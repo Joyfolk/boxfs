@@ -158,7 +158,7 @@ class BoxFsIntegrationTest {
     }
 
     @Test
-    void moveBetweenDifferentContainersFails() throws IOException {
+    void moveBetweenDifferentContainers() throws IOException {
         var container2 = tempDir.resolve("test2.box");
         var uri2 = URI.create("box:" + container2);
 
@@ -167,8 +167,11 @@ class BoxFsIntegrationTest {
             var target = fs2.getPath("/target.txt");
             Files.write(source, "content".getBytes());
 
-            var ex = assertThrows(IOException.class, () -> Files.move(source, target));
-            assertTrue(ex.getMessage().contains("different containers"));
+            Files.move(source, target);
+
+            assertFalse(Files.exists(source));
+            assertTrue(Files.exists(target));
+            assertEquals("content", Files.readString(target));
         }
     }
 
@@ -287,7 +290,7 @@ class BoxFsIntegrationTest {
     }
 
     @Test
-    void copyBetweenDifferentContainersFails() throws IOException {
+    void copyBetweenDifferentContainers() throws IOException {
         var container2 = tempDir.resolve("test2.box");
         var uri2 = URI.create("box:" + container2);
 
@@ -296,8 +299,44 @@ class BoxFsIntegrationTest {
             var target = fs2.getPath("/target.txt");
             Files.write(source, "content".getBytes());
 
-            var ex = assertThrows(IOException.class, () -> Files.copy(source, target));
-            assertTrue(ex.getMessage().contains("different containers"));
+            Files.copy(source, target);
+
+            assertTrue(Files.exists(source));
+            assertTrue(Files.exists(target));
+            assertEquals("content", Files.readString(source));
+            assertEquals("content", Files.readString(target));
+        }
+    }
+
+    @Test
+    void copyBetweenDifferentContainersReplaceExisting() throws IOException {
+        var container2 = tempDir.resolve("test2.box");
+        var uri2 = URI.create("box:" + container2);
+
+        try (var fs2 = FileSystems.newFileSystem(uri2, Map.of("create", "true", "totalBlocks", 64L))) {
+            var source = fs.getPath("/source.txt");
+            var target = fs2.getPath("/target.txt");
+            Files.write(source, "new content".getBytes());
+            Files.write(target, "old content".getBytes());
+
+            Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+
+            assertEquals("new content", Files.readString(target));
+        }
+    }
+
+    @Test
+    void copyBetweenDifferentContainersFailsIfTargetExists() throws IOException {
+        var container2 = tempDir.resolve("test2.box");
+        var uri2 = URI.create("box:" + container2);
+
+        try (var fs2 = FileSystems.newFileSystem(uri2, Map.of("create", "true", "totalBlocks", 64L))) {
+            var source = fs.getPath("/source.txt");
+            var target = fs2.getPath("/target.txt");
+            Files.write(source, "source".getBytes());
+            Files.write(target, "target".getBytes());
+
+            assertThrows(FileAlreadyExistsException.class, () -> Files.copy(source, target));
         }
     }
 

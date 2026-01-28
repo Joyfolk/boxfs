@@ -152,14 +152,12 @@ public class BoxFileSystemProvider extends FileSystemProvider {
   }
 
   /**
-   * Copies a file within the same container.
+   * Copies a file.
    * <p>
-   * Cross-container copy (between different BoxFileSystem instances) is not supported.
-   * Since all BoxPath instances share the same provider singleton, Files.copy() will
-   * always route here even for different containers. Use manual read/write for
-   * cross-container copying.
+   * Supports both same-container and cross-container copy operations.
+   * For cross-container copies, data is streamed from source to target.
    * <p>
-   * The JDK handles Cross-provider copy (e.g., BoxFS to OS filesystem) automatically
+   * The JDK handles cross-provider copy (e.g., BoxFS to OS filesystem) automatically
    * via the java.nio.file.CopyMoveHelper.copyToForeignTarget() method.
    */
   @Override
@@ -170,22 +168,51 @@ public class BoxFileSystemProvider extends FileSystemProvider {
     var sourceFs = (BoxFileSystem) boxSource.getFileSystem();
     var targetFs = (BoxFileSystem) boxTarget.getFileSystem();
 
-    if (sourceFs != targetFs) {
-      throw new IOException("Cannot copy between different containers");
+    sourceFs.checkOpen();
+    targetFs.checkOpen();
+
+    if (sourceFs == targetFs) {
+      sourceFs.copy(boxSource, boxTarget, options);
+    } else {
+      crossContainerCopy(boxSource, boxTarget, options);
+    }
+  }
+
+  private void crossContainerCopy(BoxPath source, BoxPath target, CopyOption... options) throws IOException {
+    var replaceExisting = replaceExisting(options);
+
+    if (Files.exists(target) && !replaceExisting) {
+      throw new FileAlreadyExistsException(target.toString());
     }
 
-    sourceFs.checkOpen();
-    sourceFs.copy(boxSource, boxTarget, options);
+    var openOptions = replaceExisting
+            ? new OpenOption[]{StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE}
+            : new OpenOption[]{StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE};
+
+    try (var in = Files.newInputStream(source);
+         var out = Files.newOutputStream(target, openOptions)) {
+      in.transferTo(out);
+    }
+  }
+
+  private boolean replaceExisting(CopyOption[] options) {
+    for (var option : options) {
+      if (option == StandardCopyOption.REPLACE_EXISTING) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
-   * Moves/renames a file within the same container.
+   * Moves/renames a file.
    * <p>
-   * Cross-container move is not supported. Since all BoxPath instances share the same
-   * provider singleton, Files.move() will always route here even for different containers.
+   * Supports both same-container and cross-container move operations.
+   * For same-container moves, this is an efficient metadata-only operation.
+   * For cross-container moves, data is copied then deleted from the source.
    * <p>
-   * The JDK handles Cross-provider move (e.g., BoxFS to OS filesystem) automatically
-   * via the CopyMoveHelper.moveToForeignTarget () method.
+   * The JDK handles cross-provider copy (e.g., BoxFS to OS filesystem) automatically
+   * via the java.nio.file.CopyMoveHelper.copyToForeignTarget() method.
    */
   @Override
   public void move(@NotNull Path source, @NotNull Path target, CopyOption... options) throws IOException {
@@ -195,12 +222,15 @@ public class BoxFileSystemProvider extends FileSystemProvider {
     var sourceFs = (BoxFileSystem) boxSource.getFileSystem();
     var targetFs = (BoxFileSystem) boxTarget.getFileSystem();
 
-    if (sourceFs != targetFs) {
-      throw new IOException("Cannot move between different containers");
-    }
-
     sourceFs.checkOpen();
-    sourceFs.move(boxSource, boxTarget, options);
+    targetFs.checkOpen();
+
+    if (sourceFs == targetFs) {
+      sourceFs.move(boxSource, boxTarget, options);
+    } else {
+      crossContainerCopy(boxSource, boxTarget, options);
+      sourceFs.delete(boxSource);
+    }
   }
 
   @Override
