@@ -13,6 +13,12 @@ import java.util.Set;
 /**
  * SeekableByteChannel implementation for BoxFS files.
  * Supports read, write, position, and truncate operations.
+ *
+ * <p>Limitation with TRUNCATE_EXISTING: When opening a channel with
+ * {@link StandardOpenOption#TRUNCATE_EXISTING} (e.g., via {@code Files.write(path, data)}),
+ * there is a brief window between the truncation and subsequent write operations where
+ * concurrent readers may observe an empty file. This occurs because truncation and write
+ * are separate operations, each acquiring and releasing the filesystem lock independently.
  */
 public class BoxSeekableByteChannel implements SeekableByteChannel {
 
