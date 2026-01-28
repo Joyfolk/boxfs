@@ -893,6 +893,114 @@ class BoxFsIntegrationTest {
         }
     }
 
+    // ==================== Multiple Simultaneous Channels ====================
+
+    @Test
+    void simultaneousWriteToMultipleFiles() throws IOException {
+        var input = fs.getPath("/input.bin");
+        var output1 = fs.getPath("/output1.bin");
+        var output2 = fs.getPath("/output2.bin");
+        var output3 = fs.getPath("/output3.bin");
+
+        // Create an input file with data
+        var inputData = "AABBCCAABBCCAABBCC".getBytes(); // 18 bytes
+        Files.write(input, inputData);
+
+        // Open multiple channels simultaneously and distribute data based on content
+        try (var reader = Files.newByteChannel(input, StandardOpenOption.READ);
+             var writer1 = Files.newByteChannel(output1, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+             var writer2 = Files.newByteChannel(output2, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+             var writer3 = Files.newByteChannel(output3, StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
+
+            var buf = ByteBuffer.allocate(1);
+            while (reader.read(buf) > 0) {
+                buf.flip();
+                char c = (char) buf.get(0);
+
+                // Distribute based on character
+                buf.rewind();
+                switch (c) {
+                    case 'A' -> writer1.write(buf);
+                    case 'B' -> writer2.write(buf);
+                    case 'C' -> writer3.write(buf);
+                }
+                buf.clear();
+            }
+        }
+
+        // Verify each output file got the correct bytes
+        assertEquals("AAAAAA", Files.readString(output1));
+        assertEquals("BBBBBB", Files.readString(output2));
+        assertEquals("CCCCCC", Files.readString(output3));
+    }
+
+    @Test
+    void simultaneousReadFromMultipleFiles() throws IOException {
+        var file1 = fs.getPath("/read1.txt");
+        var file2 = fs.getPath("/read2.txt");
+        var file3 = fs.getPath("/read3.txt");
+        var output = fs.getPath("/merged.txt");
+
+        Files.write(file1, "AAA".getBytes());
+        Files.write(file2, "BBB".getBytes());
+        Files.write(file3, "CCC".getBytes());
+
+        // Read from multiple files simultaneously and merge
+        try (var reader1 = Files.newByteChannel(file1, StandardOpenOption.READ);
+             var reader2 = Files.newByteChannel(file2, StandardOpenOption.READ);
+             var reader3 = Files.newByteChannel(file3, StandardOpenOption.READ);
+             var writer = Files.newByteChannel(output, StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
+
+            var buf = ByteBuffer.allocate(1);
+
+            // Interleave reads from all three files
+            for (int i = 0; i < 3; i++) {
+                buf.clear();
+                reader1.read(buf);
+                buf.flip();
+                writer.write(buf);
+
+                buf.clear();
+                reader2.read(buf);
+                buf.flip();
+                writer.write(buf);
+
+                buf.clear();
+                reader3.read(buf);
+                buf.flip();
+                writer.write(buf);
+            }
+        }
+
+        assertEquals("ABCABCABC", Files.readString(output));
+    }
+
+    @Test
+    void multipleChannelsToSameFile() throws IOException {
+        var file = fs.getPath("/shared.bin");
+        Files.write(file, new byte[100]); // Create file with 100 zero bytes
+
+        // Open two write channels to the same file at different positions
+        try (var channel1 = Files.newByteChannel(file, StandardOpenOption.WRITE);
+             var channel2 = Files.newByteChannel(file, StandardOpenOption.WRITE)) {
+
+            channel1.position(0);
+            channel2.position(50);
+
+            channel1.write(ByteBuffer.wrap("FRONT".getBytes()));
+            channel2.write(ByteBuffer.wrap("BACK".getBytes()));
+        }
+
+        var result = Files.readAllBytes(file);
+        assertEquals(100, result.length);
+
+        // Verify FRONT at position 0
+        assertEquals("FRONT", new String(result, 0, 5));
+
+        // Verify BACK at position 50
+        assertEquals("BACK", new String(result, 50, 4));
+    }
+
     private byte[] randomData(int size) {
         var data = new byte[size];
         new Random(size).nextBytes(data); // Use size as a seed for reproducibility
