@@ -565,6 +565,22 @@ class BoxFsIntegrationTest {
     }
 
     @Test
+    void operationsOnClosedFilesystemFail() throws IOException {
+        var file = fs.getPath("/test.txt");
+        Files.write(file, "content".getBytes());
+        fs.close();
+
+        assertThrows(ClosedFileSystemException.class, () -> Files.exists(file));
+        assertThrows(ClosedFileSystemException.class, () -> Files.readAllBytes(file));
+        assertThrows(ClosedFileSystemException.class, () -> Files.write(file, "new".getBytes()));
+        assertThrows(ClosedFileSystemException.class, () -> Files.delete(file));
+        assertThrows(ClosedFileSystemException.class, () -> Files.createDirectory(fs.getPath("/newdir")));
+
+        var uri = URI.create("box:" + container);
+        fs = FileSystems.newFileSystem(uri, Map.of());
+    }
+
+    @Test
     void metadataGrowthWithFragmentation() throws IOException {
         // Create a small filesystem to make fragmentation more likely
         var smallContainer = tempDir.resolve("small.box");
