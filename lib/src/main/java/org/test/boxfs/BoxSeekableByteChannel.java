@@ -160,13 +160,9 @@ public class BoxSeekableByteChannel implements SeekableByteChannel {
   }
 
   @Override
-  public void close() throws IOException {
-    if (open) {
-      open = false;
-      if (writable) {
-        fileSystem.sync();
-      }
-    }
+  public void close() {
+    // Durability is only guaranteed after explicit FileSystem.close() or sync() call.
+    open = false;
   }
 
   private void checkOpen() throws IOException {

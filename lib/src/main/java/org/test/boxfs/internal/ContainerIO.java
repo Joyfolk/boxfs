@@ -53,7 +53,7 @@ public class ContainerIO implements Closeable {
   public static ContainerIO open(Path path) throws IOException {
     var channel = FileChannel.open(path, StandardOpenOption.READ, StandardOpenOption.WRITE);
 
-    var buffer = ByteBuffer.allocate(Superblock.HEADER_SIZE);
+    var buffer = ByteBuffer.allocate(Superblock.MIN_BLOCK_SIZE);
     channel.position(0);
     while (buffer.hasRemaining()) {
       if (channel.read(buffer) == -1) {

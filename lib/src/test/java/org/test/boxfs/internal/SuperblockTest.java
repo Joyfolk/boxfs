@@ -70,7 +70,8 @@ class SuperblockTest {
     @Test
     void rejectTooManyMetadataExtents() {
         var sb = new Superblock(4096, 256);
-        for (int i = 0; i < Superblock.MAX_METADATA_EXTENTS; i++) {
+        int maxExtents = sb.getMaxMetadataExtents();
+        for (int i = 0; i < maxExtents; i++) {
             sb.addMetadataExtent(new Extent(i * 10, 1));
         }
         assertThrows(IllegalStateException.class, () -> sb.addMetadataExtent(new Extent(100, 1)));

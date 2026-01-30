@@ -13,23 +13,21 @@ import java.util.List;
  */
 public class Superblock {
 
-    public static final int HEADER_SIZE = 512;
     public static final int MIN_BLOCK_SIZE = 512;
     public static final int MAGIC = 0x424F5846; // "BOXF"
     public static final int VERSION = 1;
     public static final int DEFAULT_BLOCK_SIZE = 4096;
-    public static final int MAX_METADATA_EXTENTS = 10;
+
+    // Header: magic(4) + version(4) + blockSize(4) + totalBlocks(8) + extentCount(4) = 24 bytes
+    private static final int HEADER_FIXED_SIZE = 24;
+    // Each extent: startBlock(8) + blockCount(4) = 12 bytes
+    private static final int EXTENT_SIZE = 12;
 
     private final int blockSize;
     private final long totalBlocks;
     private final List<Extent> metadataExtents = new ArrayList<>();
 
-    public Superblock() {
-        this.blockSize = DEFAULT_BLOCK_SIZE;
-        this.totalBlocks = 0;
-    }
-
-    public Superblock(int blockSize, long totalBlocks) {
+  public Superblock(int blockSize, long totalBlocks) {
         if (blockSize < MIN_BLOCK_SIZE) {
             throw new IllegalArgumentException("blockSize must be at least " + MIN_BLOCK_SIZE);
         }
@@ -55,16 +53,21 @@ public class Superblock {
         return Collections.unmodifiableList(metadataExtents);
     }
 
+    public int getMaxMetadataExtents() {
+        return (blockSize - HEADER_FIXED_SIZE) / EXTENT_SIZE;
+    }
+
     public void setMetadataExtents(List<Extent> extents) {
-        if (extents.size() > MAX_METADATA_EXTENTS) {
-            throw new IllegalArgumentException("Too many metadata extents: " + extents.size());
+        int max = getMaxMetadataExtents();
+        if (extents.size() > max) {
+            throw new IllegalArgumentException("Too many metadata extents: " + extents.size() + " (max " + max + ")");
         }
         metadataExtents.clear();
         metadataExtents.addAll(extents);
     }
 
     public void addMetadataExtent(Extent extent) {
-        if (metadataExtents.size() >= MAX_METADATA_EXTENTS) {
+        if (metadataExtents.size() >= getMaxMetadataExtents()) {
             throw new IllegalStateException("Cannot add more metadata extents");
         }
         metadataExtents.add(extent);
@@ -99,7 +102,7 @@ public class Superblock {
      * Deserializes a superblock from a byte array.
      */
     public static Superblock deserialize(byte[] data) throws IOException {
-        if (data.length < HEADER_SIZE) {
+        if (data.length < HEADER_FIXED_SIZE) {
             throw new IOException("Superblock data too short");
         }
 
@@ -120,11 +123,12 @@ public class Superblock {
         var totalBlocks = buffer.getLong();
         var extentCount = buffer.getInt();
 
-        if (extentCount < 0 || extentCount > MAX_METADATA_EXTENTS) {
-            throw new IOException("Invalid metadata extent count: " + extentCount);
-        }
-
         var superblock = new Superblock(blockSize, totalBlocks);
+        int maxExtents = superblock.getMaxMetadataExtents();
+
+        if (extentCount < 0 || extentCount > maxExtents) {
+            throw new IOException("Invalid metadata extent count: " + extentCount + " (max " + maxExtents + ")");
+        }
 
         for (var i = 0; i < extentCount; i++) {
             var startBlock = buffer.getLong();
@@ -140,14 +144,5 @@ public class Superblock {
      */
     public long blockOffset(long blockNumber) {
         return blockSize + (blockNumber * blockSize);
-    }
-
-    /**
-     * Returns total metadata size in bytes.
-     */
-    public long getMetadataSize() {
-        return metadataExtents.stream()
-                .mapToLong(e -> e.sizeInBytes(blockSize))
-                .sum();
     }
 }

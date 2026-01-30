@@ -225,7 +225,7 @@ class BoxFsTest {
     try (var fs = BoxFs.create(containerPath)) {
       var nioFs = fs.getFileSystem();
       assertNotNull(nioFs);
-      assertTrue(nioFs instanceof BoxFileSystem);
+      assertInstanceOf(BoxFileSystem.class, nioFs);
     }
   }
 
@@ -290,7 +290,7 @@ class BoxFsTest {
       // List
       var srcFiles = fs.listDirectory("/project/src");
       assertEquals(1, srcFiles.size());
-      assertEquals("Main.java", srcFiles.get(0));
+      assertEquals("Main.java", srcFiles.getFirst());
     }
 
     // Verify persistence
