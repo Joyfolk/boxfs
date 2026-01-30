@@ -19,11 +19,11 @@ The task allowed introducing simplifications. The following choices were made:
 
 | Decision                           | Rationale                                             |
 |------------------------------------|-------------------------------------------------------|
-| No compression                     | Explicitly required by task                           |
+| No compression                     | Out of scope for core functionality                   |
 | No encryption                      | Out of scope for core functionality                   |
-| No symlinks/hardlinks              | Adds complexity without core value                    |
-| Timestamps always return epoch (0) | Simplifies implementation; can be added later         |
-| No permissions model               | Not required for core file operations                 |
+| No symlinks/hardlinks              | Out of scope for core functionality                   |
+| File attributes                    | Only timestamps                                       |
+| No permissions model               | Out of scope for core functionality                   |
 | Case-sensitive paths               | Default Java behavior, avoids platform differences    |
 | Crash consistency not guaranteed   | Data safe only after explicit `close()` or `sync()`   |
 | Fixed container size               | Capacity set at creation; no dynamic growth           |
