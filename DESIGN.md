@@ -8,8 +8,7 @@ fixed-size constraints.
 
 **Key Principles:**
 
-- **Metadata in RAM:** The directory structure and file index are loaded into memory during initialization for O(1)
-  navigation and path resolution.
+- **Metadata in RAM:** The directory structure and file index are loaded into memory during initialization.
 - **Extent-Based Storage:** Instead of tracking individual blocks, files are stored as a list of extents (start_block,
   block_count). This minimizes metadata overhead and enables contiguous disk I/O.
 - **Unified Allocation:** A single "Space Manager" handles free space for both user data and system metadata.
@@ -24,8 +23,8 @@ The container file is divided into a fixed-size Superblock and a dynamic area co
 The only fixed-location structure. It bootstraps the system:
 
 - **Block Size:** The size of a single allocation unit.
-- **Metadata Extents:** A fixed-size array of extents (e.g., 10 slots) pointing to the physical blocks where the
-  "Metadata File" is currently stored.
+- **Metadata Extents:** An array of extents pointing to the physical blocks where the
+  "Metadata File" is currently stored. Max count calculated dynamically based on block size.
 - **Total Blocks:** The total capacity of the container.
 
 ### 2.2. Metadata File (Serialized Index)
@@ -67,7 +66,7 @@ Superblock's metadata extents. It contains:
 
 ## 4. Performance & Scalability Analysis
 
-- **CPU:** Extremely low overhead; path resolution and metadata lookups happen in-memory.
+- **CPU:** Low overhead; path resolution and metadata lookups happen in-memory.
 - **RAM:** Proportional to the total number of files/folders (metadata only). File content is never buffered in full.
 - **Disk:** Metadata I/O occurs only on startup, shutdown, or fsync. Data I/O is optimized for speed via contiguous
   extents.

@@ -8,7 +8,7 @@ This is BoxFS, a Single-Container File System (SCFS) implementation in Java. Rea
 
 - Use 2-space indentation for Java files
 - Follow standard Java naming conventions (camelCase for methods/variables, PascalCase for classes)
-- Prefer explicit types over `var` for clarity
+- Use `var` for local variables where the type is clear from context
 - Keep methods focused and under 30 lines when possible
 
 ## Architecture Guidelines
@@ -26,6 +26,6 @@ This is BoxFS, a Single-Container File System (SCFS) implementation in Java. Rea
 
 ## Key Constraints
 
-- Consistency is guaranteed only on graceful `close()` or `flush()`
+- Consistency is guaranteed only on graceful `close()` or `sync()`
 - File names are limited to 255 bytes
 - The container does not shrink automatically; deleted space is recycled via the Free List

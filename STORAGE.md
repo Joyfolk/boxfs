@@ -36,7 +36,7 @@ Located at offset 0, occupies one full block. The header fields are within the f
 | 4      | 4    | uint32 | Version: `1`                              |
 | 8      | 4    | uint32 | Block size in bytes (min 512, power of 2) |
 | 12     | 8    | uint64 | Total number of blocks                    |
-| 20     | 4    | uint32 | Metadata extent count (max 10)            |
+| 20     | 4    | uint32 | Metadata extent count                     |
 | 24     | 12×N | extent | Metadata extents array                    |
 | ...    | ...  | zeros  | Padding to blockSize                      |
 
@@ -128,7 +128,7 @@ Data layout:
 
 - Block size must be a power of 2
 - Minimum block size: 512 bytes
-- Maximum metadata extents: 10
+- Maximum metadata extents: `(blockSize - 24) / 12` (dynamic based on block size)
 - Maximum file name length: 65535 bytes (uint16 limit)
 - Inode IDs are sequential, starting from 0 (root)
 - Superblock occupies exactly one block

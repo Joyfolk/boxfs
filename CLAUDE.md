@@ -32,7 +32,7 @@ BoxFS is a Single-Container File System (SCFS) implementation in Java. It provid
 
 The file system design (detailed in DESIGN.md) follows these key principles:
 
-- **Metadata in RAM**: Directory structure and file index are loaded into memory at initialization for O(1) path resolution
+- **Metadata in RAM**: Directory structure and file index are loaded into memory at initialization
 - **Extent-Based Storage**: Files stored as lists of extents (start_block, block_count) rather than individual blocks
 - **Unified Space Management**: Single "Space Manager" handles allocation for both user data and system metadata
 
@@ -137,7 +137,7 @@ Arrays.fill(buffer, (byte) 0);
 
 ## Core Assumptions (Scope Limits)
 
-- **Static Metadata Reservation**: For the initial phase, we assume a fixed metadata area size or a fixed number of extents in the Superblock to describe the "Metadata File".
+- **Dynamic Metadata Reservation**: Max metadata extents calculated dynamically based on block size (uses available superblock space).
 - **No Path Case-Sensitivity Logic**: Default to standard Java behavior (case-sensitive) to avoid extra complexity.
 - **No Symlinks/Hardlinks (Initially)**: While the architecture supports them via Inodes, do not implement them unless the core functionality is finished.
 - **In-Memory Tree Consistency**: All changes are made in RAM. Persistence only happens during `fsync` or `close`. We assume no concurrent external modification of the container file.
